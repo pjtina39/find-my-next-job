@@ -62,6 +62,22 @@ cosine. There is no keyword or alias matching.
 5. Overall fit = weighted mean over requirements (required 1.0, responsibility 0.7, preferred 0.5).
    >= 0.6 apply, >= 0.4 consider, else skip.
 
+### Second metric: LLM judge (optional)
+
+`match --judge-model VENDOR/MODEL` sends the JD and a CV to the model through
+OpenRouter and asks one question: "should this candidate be shortlisted? Yes or No".
+It reads the probability of the first answer token:
+
+    p_yes = P(Yes) / (P(Yes) + P(No))
+
+This is stored beside the fit score (`llm_judge` in the prediction) and compared
+with the label (`judge_p_yes`, `judge_agree` in the evaluation). It does not change
+the fit score or the recommendation. The CV is built from non-sensitive KB evidence
+unless you pass `--cv file.txt`. The label is never in the prompt.
+
+The model must return logprobs. Many OpenRouter models do not; then `p_yes` is
+empty and a note says why.
+
 We do not embed the whole JD as one vector. The model cuts input at about 256
 word pieces, and one vector would blur twenty requirements together.
 
@@ -90,7 +106,7 @@ cd find-my-next-job
 ```bash
 python -m fmnj ingest JOB_ID --jd jd.txt --company "Company" --title "Role" --url URL
 python -m fmnj label JOB_ID apply --by me --source "decided before running the model"
-python -m fmnj match JOB_ID
+python -m fmnj match JOB_ID                         # add --judge-model VENDOR/MODEL for the LLM judge
 python -m fmnj decide JOB_ID apply --fit 4 --pref 5 --reason "..."
 python -m fmnj generate JOB_ID                       # no API needed
 python -m fmnj generate JOB_ID --llm openrouter --model VENDOR/MODEL   # needs OPENROUTER_API_KEY

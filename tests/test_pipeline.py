@@ -58,7 +58,7 @@ def test_match_needs_label_first(env):
 
 def test_model_code_never_reads_labels():
     """Extraction, matching and generation must not touch labels."""
-    for name in ["jobs.py", "match.py", "generate.py"]:
+    for name in ["jobs.py", "match.py", "generate.py", "judge.py"]:
         src = (Path(__file__).parent.parent / "fmnj" / name).read_text()
         assert "import evaluate" not in src and "evaluate import" not in src and '"labels"' not in src, name
 
@@ -118,3 +118,17 @@ def test_label_after_prediction_is_rejected(env):
             "created_at": "2000-01-01T00:00:00Z"}
     with pytest.raises(ValueError):
         evaluate.compare(pred)
+
+
+def test_judge_reads_p_yes_from_logprobs():
+    from fmnj import judge
+    import math
+    fake = {"choices": [{"message": {"content": "Yes"}, "logprobs": {"content": [{"top_logprobs": [
+        {"token": "Yes", "logprob": math.log(0.6)}, {"token": " yes", "logprob": math.log(0.1)},
+        {"token": "No", "logprob": math.log(0.3)}]}]}}]}
+    sent = {}
+    r = judge.judge("JD text", "CV text", "some/model", call=lambda body: sent.update(body) or fake)
+    assert r["p_yes"] == 0.7
+    assert "label" not in sent["messages"][0]["content"].lower()
+    no_lp = {"choices": [{"message": {"content": "Yes"}}]}
+    assert judge.judge("JD", "CV", "m", call=lambda b: no_lp)["p_yes"] is None

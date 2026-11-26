@@ -8,7 +8,7 @@ import json
 import sys
 from pathlib import Path
 
-from . import evaluate, generate, jobs, kb as kbmod, match, review, store
+from . import evaluate, generate, jobs, judge, kb as kbmod, match, review, store
 
 
 def cmd_ingest(a):
@@ -39,6 +39,10 @@ def cmd_match(a):
     pred["created_at"] = store.now()
     pred["code_version"] = store.git_rev(store.REPO_DIR)
     pred["inputs"] = ["jobs/<job_id>/jd.md", "career-knowledge-base"]  # labels are never inputs
+    if a.judge_model:
+        cv = Path(a.cv).read_text() if a.cv else judge.cv_from_kb(kb)
+        pred["llm_judge"] = judge.judge(jd, cv, a.judge_model)
+        pred["llm_judge"]["cv_source"] = a.cv or "built from KB (non-sensitive evidence)"
     store.write_json(store.path("predictions", a.job_id, f"{pred['prediction_id']}.json"), pred)
 
     cmp = evaluate.compare(pred)
@@ -47,6 +51,9 @@ def cmd_match(a):
     print(kbmod.summary(kb))
     print(f"{len(reqs)} requirements, {len(problems)} extraction warnings")
     print(f"Fit {pred['fit_score']} -> {pred['recommendation']}  counts={pred['counts']}")
+    if "llm_judge" in pred:
+        j = pred["llm_judge"]
+        print(f"LLM judge ({j['model']}): answer={j['answer']!r} p_yes={j['p_yes']} {j['note']}")
     print(f"Label {cmp['label']}: strict agree={cmp['agree_strict']}, lenient agree={cmp['agree_lenient']}")
     print(f"Prediction {pred['prediction_id']}")
 
@@ -111,7 +118,10 @@ def main(argv=None):
     s.set_defaults(f=cmd_label)
 
     s = sub.add_parser("match", help="extract requirements, score fit, compare with label")
-    s.add_argument("job_id"); s.set_defaults(f=cmd_match)
+    s.add_argument("job_id")
+    s.add_argument("--judge-model", help="OpenRouter model id for the yes/no LLM judge (optional)")
+    s.add_argument("--cv", help="CV text file for the judge; default builds one from the KB")
+    s.set_defaults(f=cmd_match)
 
     s = sub.add_parser("decide", help="final human apply/skip after seeing the match")
     s.add_argument("job_id"); s.add_argument("value", choices=["apply", "skip"])
