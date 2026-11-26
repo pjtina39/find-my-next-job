@@ -27,7 +27,7 @@ ingest JD -> label (human, before any model) -> match -> decide (human)
 |---|---|---|
 | ingest | `jobs.py` | Saves the JD text as-is with a stable job id |
 | label | `evaluate.py` | Saves my apply/skip call **before** matching |
-| match | `jobs.py`, `match.py` | Splits the JD into requirements, finds evidence for each, scores fit, recommends apply/consider/skip |
+| match | `jobs.py`, `match.py`, `embed.py` | Splits the JD into requirements, finds evidence for each with SBERT embeddings + skill tags, scores fit, recommends apply/consider/skip |
 | compare | `evaluate.py` | Compares the recommendation with my label |
 | decide | `review.py` | My final apply/skip, plus fit and preference ratings |
 | generate | `generate.py` | Writes the CV and cover letter from evidence, then checks every claim |
@@ -88,8 +88,9 @@ data folder, not here. One job is one case, not an accuracy number.
 ## Limitations
 
 - **Requirement extraction is rule-based.** It relies on headings and bullets. Odd JD layouts need a check (`requirements.json` lists warnings).
-- **Matching is lexical.** Skill aliases plus TF-IDF. No embeddings yet, so synonyms the alias list doesn't know are missed. Some skill terms are broad (for example "analy" tags data analysis).
-- **Thresholds are guesses.** Set by hand on one job. Tune them when there are more labelled jobs.
+- **Matching** = 0.6 x skill-tag overlap + 0.4 x SBERT cosine (`all-MiniLM-L6-v2` by default, set `FMNJ_EMBED_MODEL` to change). Skill tags still come from an alias list, and some terms are broad (for example "analy" tags data analysis).
+- **The model downloads from Hugging Face on first run.** The build environment blocks that, so SBERT matching has only been tested with a fake encoder. Run it locally.
+- **Thresholds are guesses.** Set by hand on one job, before the switch to SBERT. Re-check them after the first SBERT run. Tune them when there are more labelled jobs.
 - **Education and seniority** are not in the KB, so they come back as `needs_human`.
 - **Years of experience** is an estimate from role dates, not a claim.
 - **The extractive generator** reuses evidence wording. It is safe but reads like a list. The LLM option writes better prose but has not been run yet (no key in the build environment).

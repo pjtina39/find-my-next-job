@@ -1,3 +1,4 @@
+numpy
+sentence-transformers   # SBERT for matching; downloads the model on first run
 pytest
-# optional, only for --llm
-anthropic
+anthropic               # optional, only for --llm anthropic

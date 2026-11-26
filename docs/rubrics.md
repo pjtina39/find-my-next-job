@@ -23,7 +23,7 @@ Each JD requirement gets a status:
 | unsupported | < 0.3: nothing in the KB backs it |
 | needs_human | the KB cannot answer it (education, seniority) |
 
-Score per requirement = 0.6 x skill overlap + 0.4 x text similarity (capped).
+Score per requirement = 0.6 x skill overlap + 0.4 x SBERT cosine similarity (negative values count as 0).
 Overall fit = weighted mean (required 1.0, responsibility 0.7, preferred 0.5).
 Recommendation: apply >= 0.6, consider 0.4-0.6, skip < 0.4.
 
