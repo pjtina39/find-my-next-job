@@ -1,0 +1,3 @@
+pytest
+# optional, only for --llm
+anthropic

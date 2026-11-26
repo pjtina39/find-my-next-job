@@ -1,0 +1,18 @@
+[
+  {"id": "test-llm-eval", "claim": "Built an LLM evaluation harness in Python that raised benchmark agreement to 90%.",
+   "experience_id": "acme-ml-engineer", "skills": ["llm", "evaluation", "python"],
+   "metrics": [{"value": "90%", "measures": "benchmark agreement"}],
+   "source": {"type": "document", "ref": "synthetic", "quote": "Built an LLM evaluation harness in Python that raised benchmark agreement to 90%."},
+   "verification": {"status": "unverified", "checked_on": "2026-11-26", "note": "synthetic"},
+   "sensitivity": [], "visibility": "private"},
+  {"id": "test-sql-reports", "claim": "Wrote SQL reports for cross-functional stakeholders every week.",
+   "experience_id": "acme-ml-engineer", "skills": ["sql", "stakeholder-communication"], "metrics": [],
+   "source": {"type": "document", "ref": "synthetic", "quote": "Wrote SQL reports for cross-functional stakeholders every week."},
+   "verification": {"status": "unverified", "checked_on": "2026-11-26", "note": "synthetic"},
+   "sensitivity": [], "visibility": "private"},
+  {"id": "test-secret-client", "claim": "Delivered a model for a named client worth a large contract.",
+   "experience_id": "acme-ml-engineer", "skills": ["llm"], "metrics": [],
+   "source": {"type": "document", "ref": "synthetic", "quote": "Delivered a model for a named client worth a large contract."},
+   "verification": {"status": "unverified", "checked_on": "2026-11-26", "note": "synthetic"},
+   "sensitivity": ["client_commercial_value"], "visibility": "private"}
+]

@@ -1,0 +1,7 @@
+# private data never goes in this repo
+private-data/
+*.local.*
+.env
+__pycache__/
+.pytest_cache/
+.venv/

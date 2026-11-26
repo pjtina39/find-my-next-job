@@ -1,0 +1,7 @@
+[
+  {"id": "python", "name": "Python", "category": "data", "aliases": ["Python"], "source": "synthetic"},
+  {"id": "sql", "name": "SQL", "category": "data", "aliases": ["SQL"], "source": "synthetic"},
+  {"id": "llm", "name": "LLMs", "category": "ml-ai", "aliases": ["LLMs", "LLM"], "source": "synthetic"},
+  {"id": "evaluation", "name": "Model evaluation", "category": "ml-ai", "aliases": ["benchmarking"], "source": "synthetic"},
+  {"id": "stakeholder-communication", "name": "Stakeholder communication", "category": "product-business", "aliases": ["cross-functional collaboration"], "source": "synthetic"}
+]
