@@ -34,8 +34,19 @@ def test_extract_sections_and_skills(env):
     assert {"responsibility", "required", "preferred"} <= types
     assert not any("fictional" in r["text"] for r in reqs), "About Us must be ignored"
     r = next(r for r in reqs if "3+ years" in r["text"])
-    assert r["years"] == 3 and {"python", "sql"} <= set(r["skills"])
+    assert r["years"] == 3 and "SQL" in r["phrases"]
     assert any(r["is_education"] for r in reqs)
+
+
+def test_phrases_map_to_kb_skills_by_embedding(env):
+    from fmnj import jobs, kb, match
+    k = kb.load(FIX / "kb")
+    reqs = jobs.extract((FIX / "jd.md").read_text())
+    match.map_skills(reqs, k)
+    r = next(r for r in reqs if "3+ years" in r["text"])
+    assert "sql" in r["skills"]
+    kube = next(r for r in reqs if "Kubernetes" in r["text"])
+    assert kube["skills"] == [], "unknown skills must stay unmapped"
 
 
 def test_match_needs_label_first(env):
