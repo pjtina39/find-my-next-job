@@ -6,7 +6,8 @@ achievement line with no evidence, and any use of sensitive evidence.
 
 Two generators:
   extractive (default): reuses evidence claims word for word. No API needed.
-  llm: Claude rewrites from the same evidence pack. Needs ANTHROPIC_API_KEY.
+  llm: a model rewrites from the same evidence pack.
+       --llm anthropic needs ANTHROPIC_API_KEY; --llm openrouter needs OPENROUTER_API_KEY and --model.
 """
 import json
 import os
@@ -58,11 +59,13 @@ def extractive(job: dict, kb: dict, prediction: dict, evidence: list, name: str)
     skill_name = {s["id"]: s["name"] for s in kb["skills"]}
 
     # skills: ones with relevant evidence first
-    skill_rank = {}
-    for ev in evidence:
-        for s in ev["skills"]:
-            skill_rank[s] = max(skill_rank.get(s, 0), ev["relevance"])
-    top_skills = [skill_name[s] for s, _ in sorted(skill_rank.items(), key=lambda x: -x[1])]
+    # skills: the ones the JD asks for most come first; only skills with evidence
+    have = {s for ev in evidence for s in ev["skills"]}
+    asked = {}
+    for r in prediction["requirements"]:
+        for sid in r["skills"]:
+            asked[sid] = asked.get(sid, 0) + TYPE_WEIGHT.get(r["type"], 0)
+    top_skills = [skill_name[s] for s in sorted(have, key=lambda s: (-asked.get(s, 0), s))]
 
     cv = [line(f"# {name}", kind="header"),
           line(f"Tailored for: {job['title']}, {job['company']}", kind="header"),
@@ -93,7 +96,17 @@ def extractive(job: dict, kb: dict, prediction: dict, evidence: list, name: str)
     cv.append(line("## Education", kind="header"))
     cv.append(line("TODO: add by hand. Education is not in the knowledge base yet.", kind="todo"))
 
-    top3 = [e for e in evidence if e["experience_id"]][:3]
+    by_id = {e["id"]: e for e in evidence if e["experience_id"]}
+    top3 = []
+    for r in prediction["requirements"]:
+        if r["type"] != "required":
+            continue
+        for e in r["evidence"]:
+            ev = by_id.get(e["evidence_id"])
+            if ev and ev not in top3 and e["score"] >= 0.3:
+                top3.append(ev)
+                break
+    top3 = top3[:3]
     org = {r["id"]: r["org"] for r in kb["experience"]}
     cl = [line("Dear Hiring Team,", kind="text"),
           line(f"I am applying for the {job['title']} role at {job['company']}. "
@@ -131,17 +144,20 @@ Rules:
 - Plain, direct British English. No buzzwords."""
 
 
-def llm(job: dict, jd: str, kb: dict, evidence: list, name: str) -> dict:
-    import anthropic  # optional dependency
-
+def llm(job: dict, jd: str, kb: dict, evidence: list, name: str,
+        provider: str = "anthropic", model: str | None = None) -> dict:
     pack = [{"id": e["id"], "role": e["experience_id"], "project": e.get("project_id"),
              "claim": e["claim"], "metrics": e["metrics"]} for e in evidence]
     roles = [{k: r[k] for k in ["id", "org", "title", "start", "end"]} for r in kb["experience"]]
     user = (f"Candidate name: {name}\n\nJob: {job['title']} at {job['company']}\n\nJD:\n{jd}\n\n"
             f"Roles:\n{json.dumps(roles)}\n\nEvidence:\n{json.dumps(pack)}")
+    if provider == "openrouter":
+        return openrouter(model, user)
+
+    import anthropic  # optional dependency
     client = anthropic.Anthropic()
     with client.messages.stream(
-        model=MODEL, max_tokens=32000, system=LLM_SYSTEM,
+        model=model or MODEL, max_tokens=32000, system=LLM_SYSTEM,
         output_config={"effort": "high", "format": {"type": "json_schema", "schema": LLM_SCHEMA}},
         messages=[{"role": "user", "content": user}],
     ) as stream:
@@ -150,6 +166,24 @@ def llm(job: dict, jd: str, kb: dict, evidence: list, name: str) -> dict:
         raise RuntimeError("Model refused. Use the extractive generator.")
     text = next(b.text for b in msg.content if b.type == "text")
     return json.loads(text)
+
+
+def openrouter(model: str, user: str) -> dict:
+    """OpenRouter chat completions. Needs OPENROUTER_API_KEY and a model id."""
+    import urllib.request
+    if not model:
+        raise ValueError("Pass --model for OpenRouter, e.g. the model id from openrouter.ai/models")
+    body = {"model": model, "messages": [{"role": "system", "content": LLM_SYSTEM},
+                                         {"role": "user", "content": user}],
+            "response_format": {"type": "json_schema",
+                                "json_schema": {"name": "docs", "strict": True, "schema": LLM_SCHEMA}}}
+    req = urllib.request.Request(
+        "https://openrouter.ai/api/v1/chat/completions", data=json.dumps(body).encode(),
+        headers={"Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}",
+                 "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=300) as r:
+        out = json.load(r)
+    return json.loads(out["choices"][0]["message"]["content"])
 
 
 NUM = re.compile(r"\d[\d,.]*\s?%?|\d+(?:\.\d+)?\s?(?:days|hrs|hours|x)")
@@ -192,11 +226,13 @@ def to_markdown(doc: list) -> str:
     return "\n".join(out) + "\n"
 
 
-def generate(job: dict, jd: str, kb: dict, prediction: dict, use_llm: bool = False,
-             allow_sensitive: bool = False) -> dict:
+def generate(job: dict, jd: str, kb: dict, prediction: dict, provider: str | None = None,
+             model: str | None = None, allow_sensitive: bool = False) -> dict:
+    """provider: None = extractive, or 'anthropic' / 'openrouter'."""
+    use_llm = provider is not None
     name = os.environ.get("FMNJ_CANDIDATE_NAME", "Candidate")
     evidence, excluded = select_evidence(kb, prediction, allow_sensitive)
-    docs = llm(job, jd, kb, evidence, name) if use_llm else extractive(job, kb, prediction, evidence, name)
+    docs = llm(job, jd, kb, evidence, name, provider, model) if use_llm else extractive(job, kb, prediction, evidence, name)
 
     gen_id = store.new_id("gen")
     folder = store.path("generations", job["job_id"], gen_id, "x").parent
@@ -206,8 +242,8 @@ def generate(job: dict, jd: str, kb: dict, prediction: dict, use_llm: bool = Fal
         "prediction_id": prediction["prediction_id"],
         "kb_version": kb["version"],
         "code_version": store.git_rev(store.REPO_DIR),
-        "generator": "llm" if use_llm else GENERATOR_VERSION,
-        "model": MODEL if use_llm else None,
+        "generator": f"llm-{provider}" if use_llm else GENERATOR_VERSION,
+        "model": (model or MODEL) if use_llm else None,
         "prompt_version": PROMPT_VERSION if use_llm else None,
         "created_at": store.now(),
         "excluded_sensitive_evidence": excluded,
