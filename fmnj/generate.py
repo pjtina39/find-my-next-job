@@ -227,12 +227,20 @@ def to_markdown(doc: list) -> str:
 
 
 def generate(job: dict, jd: str, kb: dict, prediction: dict, provider: str | None = None,
-             model: str | None = None, allow_sensitive: bool = False) -> dict:
-    """provider: None = extractive, or 'anthropic' / 'openrouter'."""
+             model: str | None = None, allow_sensitive: bool = False,
+             lines_file: str | None = None) -> dict:
+    """provider: None = extractive, 'anthropic' / 'openrouter' = API call,
+    'file' = lines written elsewhere (e.g. by a Claude session) in the same
+    JSON format as the LLM output. All go through the same claim check."""
     use_llm = provider is not None
     name = os.environ.get("FMNJ_CANDIDATE_NAME", "Candidate")
     evidence, excluded = select_evidence(kb, prediction, allow_sensitive)
-    docs = llm(job, jd, kb, evidence, name, provider, model) if use_llm else extractive(job, kb, prediction, evidence, name)
+    if provider == "file":
+        docs = json.loads(open(lines_file).read())
+    elif use_llm:
+        docs = llm(job, jd, kb, evidence, name, provider, model)
+    else:
+        docs = extractive(job, kb, prediction, evidence, name)
 
     gen_id = store.new_id("gen")
     folder = store.path("generations", job["job_id"], gen_id, "x").parent
@@ -243,8 +251,9 @@ def generate(job: dict, jd: str, kb: dict, prediction: dict, provider: str | Non
         "kb_version": kb["version"],
         "code_version": store.git_rev(store.REPO_DIR),
         "generator": f"llm-{provider}" if use_llm else GENERATOR_VERSION,
-        "model": (model or MODEL) if use_llm else None,
-        "prompt_version": PROMPT_VERSION if use_llm else None,
+        "model": (model or (None if provider == "file" else MODEL)) if use_llm else None,
+        "prompt_version": PROMPT_VERSION if use_llm else None,  # 'file' follows the same rules
+        "lines_file": lines_file,
         "created_at": store.now(),
         "excluded_sensitive_evidence": excluded,
         "documents": {},

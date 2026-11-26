@@ -70,8 +70,9 @@ def cmd_generate(a):
         sys.exit("Documents are only generated after a human 'apply' decision (fmnj decide).")
     kb = kbmod.load()
     job, jd = jobs.load_job(a.job_id)
-    meta = generate.generate(job, jd, kb, latest_prediction(a.job_id), a.llm, a.model,
-                             a.allow_sensitive)
+    meta = generate.generate(job, jd, kb, latest_prediction(a.job_id),
+                             "file" if a.from_file else a.llm, a.model, a.allow_sensitive,
+                             a.from_file)
     print(f"Generation {meta['generation_id']}")
     for kind, doc in meta["documents"].items():
         print(f"  {kind}: {len(doc['evidence_ids'])} evidence ids, {len(doc['claim_flags'])} flags")
@@ -121,7 +122,8 @@ def main(argv=None):
     s = sub.add_parser("generate", help="write CV and cover letter")
     s.add_argument("job_id"); s.add_argument("--llm", choices=["anthropic", "openrouter"],
                                              help="default: extractive, no API")
-    s.add_argument("--model", help="model id, required for openrouter")
+    s.add_argument("--model", help="model id, required for openrouter; a label for --from-file")
+    s.add_argument("--from-file", help="JSON with cv and cover_letter lines written elsewhere")
     s.add_argument("--allow-sensitive", action="store_true")
     s.set_defaults(f=cmd_generate)
 
