@@ -21,13 +21,18 @@ MAX_BULLETS_TOP_ROLE = 5
 MAX_BULLETS_OTHER = 2
 
 
+TYPE_WEIGHT = {"required": 1.0, "responsibility": 0.7, "preferred": 0.5}
+
+
 def relevance(prediction: dict) -> dict:
-    """Evidence id -> best score across all requirements."""
-    best = {}
+    """Evidence id -> weighted sum of its scores across requirements.
+    Evidence that backs many required items ranks first."""
+    total = {}
     for r in prediction["requirements"]:
+        w = TYPE_WEIGHT.get(r["type"], 0)
         for e in r["evidence"]:
-            best[e["evidence_id"]] = max(best.get(e["evidence_id"], 0), e["score"])
-    return best
+            total[e["evidence_id"]] = round(total.get(e["evidence_id"], 0) + w * e["score"], 3)
+    return total
 
 
 def select_evidence(kb: dict, prediction: dict, allow_sensitive: bool = False) -> tuple[list, list]:
@@ -65,7 +70,7 @@ def extractive(job: dict, kb: dict, prediction: dict, evidence: list, name: str)
     current = kb["experience"][0]
     summary_ids = [e["id"] for e in evidence[:3]]
     cv.append(line(f"{current['title']} at {current['org']}. Recent work covers "
-                   f"{', '.join(top_skills[:4]).lower()}.", summary_ids, "summary"))
+                   f"{', '.join(top_skills[:4])}.", summary_ids, "summary"))
 
     cv.append(line("## Experience", kind="header"))
     for i, role in enumerate(kb["experience"]):
@@ -93,9 +98,10 @@ def extractive(job: dict, kb: dict, prediction: dict, evidence: list, name: str)
     cl = [line("Dear Hiring Team,", kind="text"),
           line(f"I am applying for the {job['title']} role at {job['company']}. "
                f"I am currently {current['title']} at {current['org']}.", kind="text")]
-    for ev in top3:
+    for i, ev in enumerate(top3):
         claim = ev["claim"][0].lower() + ev["claim"][1:]
-        cl.append(line(f"At {org[ev['experience_id']]}, I {claim}", [ev["id"]]))
+        lead = f"At {org[ev['experience_id']]}, I" if i == 0 else "I also"
+        cl.append(line(f"{lead} {claim}", [ev["id"]]))
     cl.append(line("TODO: add one or two sentences on why this team and role. "
                    "The knowledge base has no record of your motivation.", kind="todo"))
     cl.append(line("Thank you for your time. I would welcome the chance to talk.", kind="text"))
