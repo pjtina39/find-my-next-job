@@ -84,13 +84,12 @@ word pieces, and one vector would blur twenty requirements together.
 ## Setup
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+uv sync                      # add --extra anthropic for --llm anthropic
 export FMNJ_KB_DIR=../career-knowledge-base
 export FMNJ_DATA_DIR=~/fmnj-private-data      # anywhere outside this repo
 export FMNJ_CANDIDATE_NAME="Your Name"
 export OPENROUTER_API_KEY=...                  # only for --llm openrouter; type it in your terminal, never commit it
-pytest -q
+uv run pytest -q
 ```
 
 Both repos should sit side by side:
@@ -104,17 +103,17 @@ cd find-my-next-job
 ## Run
 
 ```bash
-python -m fmnj ingest JOB_ID --jd jd.txt --company "Company" --title "Role" --url URL
-python -m fmnj label JOB_ID apply --by me --source "decided before running the model"
-python -m fmnj match JOB_ID                         # add --judge-model VENDOR/MODEL for the LLM judge
-python -m fmnj decide JOB_ID apply --fit 4 --pref 5 --reason "..."
-python -m fmnj generate JOB_ID                       # no API needed
-python -m fmnj generate JOB_ID --llm openrouter --model VENDOR/MODEL   # needs OPENROUTER_API_KEY
-python -m fmnj generate JOB_ID --llm anthropic       # needs ANTHROPIC_API_KEY
-python -m fmnj review JOB_ID GEN_ID --doc cv \
+uv run python -m fmnj ingest JOB_ID --jd jd.txt --company "Company" --title "Role" --url URL
+uv run python -m fmnj label JOB_ID apply --by me --source "decided before running the model"
+uv run python -m fmnj match JOB_ID                         # add --judge-model VENDOR/MODEL for the LLM judge
+uv run python -m fmnj decide JOB_ID apply --fit 4 --pref 5 --reason "..."
+uv run python -m fmnj generate JOB_ID                       # no API needed
+uv run python -m fmnj generate JOB_ID --llm openrouter --model VENDOR/MODEL   # needs OPENROUTER_API_KEY
+uv run python -m fmnj generate JOB_ID --llm anthropic       # needs ANTHROPIC_API_KEY
+uv run python -m fmnj review JOB_ID GEN_ID --doc cv \
   --ratings factual_accuracy=5,relevance=4,evidence_selection=4,impact=4,writing_style=4,overall=4 \
   --comment "..." --edited my_cv.md --approve
-python -m fmnj show JOB_ID
+uv run python -m fmnj show JOB_ID
 ```
 
 ## Results

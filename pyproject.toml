@@ -1,0 +1,19 @@
+[project]
+name = "find-my-next-job"
+version = "0.1.0"
+description = "Match a job description to my career evidence and draft a tailored CV and cover letter"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy",
+    "sentence-transformers",
+]
+
+[project.optional-dependencies]
+anthropic = ["anthropic"]
+
+[dependency-groups]
+dev = ["pytest"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
