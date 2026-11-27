@@ -6,7 +6,7 @@ import zlib
 import numpy as np
 import pytest
 
-from fmnj import embed
+from src import embed
 
 
 def fake_encode(texts):

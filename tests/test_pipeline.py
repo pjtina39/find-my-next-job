@@ -13,9 +13,9 @@ JOB = "test-job"
 def env(tmp_path, monkeypatch):
     monkeypatch.setenv("FMNJ_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("FMNJ_KB_DIR", str(FIX / "kb"))
-    from fmnj import store
+    from src import store
     importlib.reload(store)
-    from fmnj import cli
+    from src import cli
     return cli, tmp_path
 
 
@@ -28,7 +28,7 @@ def ingest(cli):
 
 
 def test_extract_sections_and_skills(env):
-    from fmnj import jobs, kb
+    from src import jobs, kb
     reqs = jobs.extract((FIX / "jd.md").read_text(), kb.load(FIX / "kb"))
     types = {r["type"] for r in reqs}
     assert {"responsibility", "required", "preferred"} <= types
@@ -39,7 +39,7 @@ def test_extract_sections_and_skills(env):
 
 
 def test_phrases_map_to_kb_skills_by_embedding(env):
-    from fmnj import jobs, kb, match
+    from src import jobs, kb, match
     k = kb.load(FIX / "kb")
     reqs = jobs.extract((FIX / "jd.md").read_text())
     match.map_skills(reqs, k)
@@ -59,7 +59,7 @@ def test_match_needs_label_first(env):
 def test_model_code_never_reads_labels():
     """Extraction, matching and generation must not touch labels."""
     for name in ["jobs.py", "match.py", "generate.py", "judge.py"]:
-        src = (Path(__file__).parent.parent / "fmnj" / name).read_text()
+        src = (Path(__file__).parent.parent / "src" / name).read_text()
         assert "import evaluate" not in src and "evaluate import" not in src and '"labels"' not in src, name
 
 
@@ -103,7 +103,7 @@ def test_full_pipeline(env):
 
 
 def test_claim_check_flags_inflated_number(env):
-    from fmnj import generate, kb
+    from src import generate, kb
     k = kb.load(FIX / "kb")
     doc = [{"text": "Raised benchmark agreement to 99%.", "evidence_ids": ["test-llm-eval"], "kind": "claim"},
            {"text": "Led a team of 12.", "evidence_ids": [], "kind": "claim"}]
@@ -112,7 +112,7 @@ def test_claim_check_flags_inflated_number(env):
 
 
 def test_label_after_prediction_is_rejected(env):
-    from fmnj import evaluate
+    from src import evaluate
     evaluate.save_label(JOB, "apply", "tester", "test")
     pred = {"job_id": JOB, "prediction_id": "p1", "recommendation": "apply",
             "created_at": "2000-01-01T00:00:00Z"}
@@ -121,7 +121,7 @@ def test_label_after_prediction_is_rejected(env):
 
 
 def test_judge_reads_p_yes_from_logprobs():
-    from fmnj import judge
+    from src import judge
     import math
     fake = {"choices": [{"message": {"content": "Yes"}, "logprobs": {"content": [{"top_logprobs": [
         {"token": "Yes", "logprob": math.log(0.6)}, {"token": " yes", "logprob": math.log(0.1)},

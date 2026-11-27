@@ -1,7 +1,7 @@
 """Command line for the V0.1 pipeline.
 
 Order: ingest -> label -> match -> decide -> generate -> review
-Run `python -m fmnj <command> -h` for options.
+Run `python -m src <command> -h` for options.
 """
 import argparse
 import json

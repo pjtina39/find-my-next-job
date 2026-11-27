@@ -104,17 +104,17 @@ cd find-my-next-job
 ## Run
 
 ```bash
-uv run python -m fmnj ingest JOB_ID --jd jd.txt --company "Company" --title "Role" --url URL
-uv run python -m fmnj label JOB_ID apply --by me --source "decided before running the model"
-uv run python -m fmnj match JOB_ID                         # add --judge-model VENDOR/MODEL for the LLM judge
-uv run python -m fmnj decide JOB_ID apply --fit 4 --pref 5 --reason "..."
-uv run python -m fmnj generate JOB_ID                       # no API needed
-uv run python -m fmnj generate JOB_ID --llm openrouter --model VENDOR/MODEL   # needs OPENROUTER_API_KEY
-uv run python -m fmnj generate JOB_ID --llm anthropic       # needs ANTHROPIC_API_KEY
-uv run python -m fmnj review JOB_ID GEN_ID --doc cv \
+uv run python -m src ingest JOB_ID --jd jd.txt --company "Company" --title "Role" --url URL
+uv run python -m src label JOB_ID apply --by me --source "decided before running the model"
+uv run python -m src match JOB_ID                         # add --judge-model VENDOR/MODEL for the LLM judge
+uv run python -m src decide JOB_ID apply --fit 4 --pref 5 --reason "..."
+uv run python -m src generate JOB_ID                       # no API needed
+uv run python -m src generate JOB_ID --llm openrouter --model VENDOR/MODEL   # needs OPENROUTER_API_KEY
+uv run python -m src generate JOB_ID --llm anthropic       # needs ANTHROPIC_API_KEY
+uv run python -m src review JOB_ID GEN_ID --doc cv \
   --ratings factual_accuracy=5,relevance=4,evidence_selection=4,impact=4,writing_style=4,overall=4 \
   --comment "..." --edited my_cv.md --approve
-uv run python -m fmnj show JOB_ID
+uv run python -m src show JOB_ID
 ```
 
 ## Results
