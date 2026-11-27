@@ -23,7 +23,7 @@ from datetime import date
 
 from . import embed
 
-METHOD_VERSION = "match-v0.3-sbert-skills"
+METHOD_VERSION = "match-v0.4-must-have"
 SKILL_WEIGHT, TEXT_WEIGHT = 0.5, 0.5
 SKILL_SIM = 0.5                        # phrase -> KB skill threshold (untuned)
 MATCHED, PARTIAL = 0.6, 0.3            # requirement thresholds
@@ -131,7 +131,7 @@ def predict(job: dict, reqs: list[dict], kb: dict) -> dict:
         "qualifications": "needs_human" if any(r["is_education"] for r in results) else None,
         "seniority": "needs_human",
     }
-    rec = "apply" if fit >= APPLY else "consider" if fit >= CONSIDER else "skip"
+    rec, missing_required = recommend(fit, results)
     counts = Counter(r["status"] for r in results)
     return {
         "job_id": job["job_id"],
@@ -141,6 +141,7 @@ def predict(job: dict, reqs: list[dict], kb: dict) -> dict:
         "kb_version": kb["version"],
         "fit_score": round(fit, 3),
         "recommendation": rec,
+        "missing_required": missing_required,
         "dimensions": dims,
         "counts": dict(counts),
         "strengths": [r["text"] for r in sorted(matched, key=lambda r: -r["score"])[:5]],
@@ -150,6 +151,16 @@ def predict(job: dict, reqs: list[dict], kb: dict) -> dict:
         "requirements": results,
         "thresholds": {"skill_sim": SKILL_SIM, "matched": MATCHED, "partial": PARTIAL, "apply": APPLY, "consider": CONSIDER},
     }
+
+
+def recommend(fit: float, results: list[dict]) -> tuple[str, list[str]]:
+    """apply / consider / skip from the fit score. A required item with no
+    evidence caps the result at 'consider': no evidence is not proof of absence."""
+    missing = [r["id"] for r in results if r["type"] == "required" and r["status"] == "unsupported"]
+    rec = "apply" if fit >= APPLY else "consider" if fit >= CONSIDER else "skip"
+    if rec == "apply" and missing:
+        rec = "consider"
+    return rec, missing
 
 
 def avg(xs) -> float | None:

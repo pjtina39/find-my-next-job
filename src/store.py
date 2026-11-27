@@ -12,6 +12,7 @@ from pathlib import Path
 REPO_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = Path(os.environ.get("FMNJ_DATA_DIR", REPO_DIR / "private-data"))
 KB_DIR = Path(os.environ.get("FMNJ_KB_DIR", REPO_DIR.parent / "career-knowledge-base"))
+JOBS_DIR = Path(os.environ.get("FMNJ_JOBS_DIR", REPO_DIR / "data"))  # gitignored: jd/<job_id>.txt + job.json
 
 
 def now() -> str:

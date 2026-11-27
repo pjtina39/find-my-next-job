@@ -26,6 +26,7 @@ Each JD requirement gets a status:
 Score per requirement = 0.5 x skill score + 0.5 x SBERT sentence cosine. Skill score = share of the requirement's phrases (mapped to KB skills by embedding, cosine >= 0.5) that the evidence has. See README, How matching works.
 Overall fit = weighted mean (required 1.0, responsibility 0.7, preferred 0.5).
 Recommendation: apply >= 0.6, consider 0.4-0.6, skip < 0.4.
+If any required item is unsupported, apply is capped at consider (listed in `missing_required`).
 
 Dimensions reported: skills, experience (years), achievements (share of matched
 requirements backed by evidence with a metric), qualifications, seniority.

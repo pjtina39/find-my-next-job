@@ -61,6 +61,8 @@ cosine. There is no keyword or alias matching.
 4. The requirement keeps its best evidence: >= 0.6 matched, >= 0.3 partial, else unsupported.
 5. Overall fit = weighted mean over requirements (required 1.0, responsibility 0.7, preferred 0.5).
    >= 0.6 apply, >= 0.4 consider, else skip.
+   A required item with no evidence (unsupported) caps the result at consider, never skip:
+   no evidence in the KB is not proof the skill is missing. See `missing_required` in the prediction.
 
 ### Second metric: LLM judge (optional)
 
@@ -120,7 +122,7 @@ cd find-my-next-job
 ## Run
 
 ```bash
-uv run python -m src ingest JOB_ID --jd jd.txt --company "Company" --title "Role" --url URL
+uv run python -m src ingest --jd jd.txt --company "Company" --title "Role" --url URL   # saves data/jd/<company>_<role>=<uuid>.txt + an entry in data/job.json
 uv run python -m src label JOB_ID apply --by me --source "decided before running the model"
 uv run python -m src match JOB_ID                         # add --judge-model VENDOR/MODEL and/or --jev
 uv run python -m src decide JOB_ID apply --fit 4 --pref 5 --reason "..."

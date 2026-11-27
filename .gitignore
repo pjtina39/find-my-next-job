@@ -1,5 +1,6 @@
 # private data never goes in this repo
 private-data/
+data/
 *.local.*
 .env
 

@@ -13,6 +13,7 @@ JOB = "test-job"
 def env(tmp_path, monkeypatch):
     monkeypatch.setenv("FMNJ_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("FMNJ_KB_DIR", str(FIX / "kb"))
+    monkeypatch.setenv("FMNJ_JOBS_DIR", str(tmp_path / "jobs"))
     from src import store
     importlib.reload(store)
     from src import cli
@@ -24,12 +25,12 @@ def run(cli, *args):
 
 
 def ingest(cli):
-    run(cli, "ingest", JOB, "--jd", str(FIX / "jd.md"), "--company", "Test Co", "--title", "Test Role")
+    run(cli, "ingest", JOB, "--jd", str(FIX / "jd.txt"), "--company", "Test Co", "--title", "Test Role")
 
 
 def test_extract_sections_and_skills(env):
     from src import jobs, kb
-    reqs = jobs.extract((FIX / "jd.md").read_text(), kb.load(FIX / "kb"))
+    reqs = jobs.extract((FIX / "jd.txt").read_text(), kb.load(FIX / "kb"))
     types = {r["type"] for r in reqs}
     assert {"responsibility", "required", "preferred"} <= types
     assert not any("fictional" in r["text"] for r in reqs), "About Us must be ignored"
@@ -38,15 +39,38 @@ def test_extract_sections_and_skills(env):
     assert any(r["is_education"] for r in reqs)
 
 
+def test_unbulleted_short_lines_are_requirements_not_headings():
+    from src import jobs
+    jd = ("Required Qualifications, Capabilities, And Skills\n"
+          "Strong analytical, problem-solving, and communication skills\n"
+          "Preferred Qualifications:\n"
+          "Advanced degree in a quantitative discipline\n"
+          "Familiarity with cloud-based data and analytics platforms\n")
+    reqs = jobs.extract(jd)
+    assert [(r["type"], r["text"].split()[0]) for r in reqs] == [
+        ("required", "Strong"), ("preferred", "Advanced"), ("preferred", "Familiarity")]
+
+
 def test_phrases_map_to_kb_skills_by_embedding(env):
     from src import jobs, kb, match
     k = kb.load(FIX / "kb")
-    reqs = jobs.extract((FIX / "jd.md").read_text())
+    reqs = jobs.extract((FIX / "jd.txt").read_text())
     match.map_skills(reqs, k)
     r = next(r for r in reqs if "3+ years" in r["text"])
     assert "sql" in r["skills"]
     kube = next(r for r in reqs if "Kubernetes" in r["text"])
     assert kube["skills"] == [], "unknown skills must stay unmapped"
+
+
+def test_ingest_without_id_makes_company_role_uuid(env):
+    cli, tmp = env
+    run(cli, "ingest", "--jd", str(FIX / "jd.txt"), "--company", "JP Morgan", "--title", "Applied AI & ML")
+    (jd,) = (tmp / "jobs" / "jd").iterdir()
+    name, uid = jd.stem.split("=")
+    company, role = name.split("_")
+    assert (company, role) == ("jp-morgan", "applied-ai-ml") and len(uid) == 36
+    registry = json.loads((tmp / "jobs" / "job.json").read_text())
+    assert registry[jd.stem]["jd_file"] == f"jd/{jd.stem}.txt"
 
 
 def test_match_needs_label_first(env):
@@ -109,6 +133,16 @@ def test_claim_check_flags_inflated_number(env):
            {"text": "Led a team of 12.", "evidence_ids": [], "kind": "claim"}]
     types = [f["type"] for f in generate.check_claims(doc, k)]
     assert "unsupported_number" in types and "no_evidence" in types
+
+
+def test_missing_required_caps_apply_at_consider():
+    from src import match
+    ok = {"id": "r01", "type": "required", "status": "matched"}
+    gap = {"id": "r02", "type": "required", "status": "unsupported"}
+    nice = {"id": "r03", "type": "preferred", "status": "unsupported"}
+    assert match.recommend(0.8, [ok, nice]) == ("apply", [])         # preferred gap: no cap
+    assert match.recommend(0.8, [ok, gap]) == ("consider", ["r02"])  # required gap: capped
+    assert match.recommend(0.3, [ok, gap]) == ("skip", ["r02"])      # cap never raises a score
 
 
 def test_label_after_prediction_is_rejected(env):

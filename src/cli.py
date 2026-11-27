@@ -15,7 +15,7 @@ def cmd_ingest(a):
     meta = {"company": a.company, "title": a.title, "source_url": a.url,
             "requisition_id": a.req_id, "location": a.location}
     job = jobs.ingest(a.job_id, Path(a.jd).read_text(), meta)
-    print(f"Saved job {job['job_id']} to {store.path('jobs', a.job_id, 'x').parent}")
+    print(f"Saved job {job['job_id']} to {jobs.jd_path(job['job_id'])}")
 
 
 def cmd_label(a):
@@ -30,7 +30,7 @@ def cmd_match(a):
     job, jd = jobs.load_job(a.job_id)
     reqs = jobs.extract(jd, kb)
     problems = jobs.validate(reqs)
-    store.write_json(store.path("jobs", a.job_id, "requirements.json"),
+    store.write_json(store.path("requirements", f"{a.job_id}.json"),
                      {"job_id": a.job_id, "extracted_at": store.now(), "method": "rules-v0.1",
                       "requirements": reqs, "problems": problems}, overwrite=True)
 
@@ -38,7 +38,7 @@ def cmd_match(a):
     pred["prediction_id"] = store.new_id("pred")
     pred["created_at"] = store.now()
     pred["code_version"] = store.git_rev(store.REPO_DIR)
-    pred["inputs"] = ["jobs/<job_id>/jd.md", "career-knowledge-base"]  # labels are never inputs
+    pred["inputs"] = ["data/jd/<job_id>.txt", "career-knowledge-base"]  # labels are never inputs
     if a.judge_model or a.jev:
         cv = Path(a.cv).read_text() if a.cv else judge.cv_from_kb(kb)
         cv_source = a.cv or "built from KB (non-sensitive evidence)"
@@ -56,6 +56,8 @@ def cmd_match(a):
     print(kbmod.summary(kb))
     print(f"{len(reqs)} requirements, {len(problems)} extraction warnings")
     print(f"Fit {pred['fit_score']} -> {pred['recommendation']}  counts={pred['counts']}")
+    if pred["missing_required"]:
+        print(f"Required items with no evidence (capped at consider): {pred['missing_required']}")
     if "llm_judge" in pred:
         j = pred["llm_judge"]
         print(f"LLM judge ({j['model']}): answer={j['answer']!r} p_yes={j['p_yes']} {j['note']}")
@@ -115,7 +117,8 @@ def main(argv=None):
     sub = p.add_subparsers(dest="cmd", required=True)
 
     s = sub.add_parser("ingest", help="save a JD")
-    s.add_argument("job_id"); s.add_argument("--jd", required=True, help="text file with the JD")
+    s.add_argument("job_id", nargs="?", help="default: <company>_<role>=<uuid>")
+    s.add_argument("--jd", required=True, help="text file with the JD")
     s.add_argument("--company", required=True); s.add_argument("--title", required=True)
     s.add_argument("--url"); s.add_argument("--req-id"); s.add_argument("--location")
     s.set_defaults(f=cmd_ingest)
