@@ -1,0 +1,3 @@
+[
+  {"id": "acme-ml-engineer", "org": "Acme Analytics", "title": "ML Engineer", "start": "2022-01", "end": "present", "location": "Test City", "summary": "Synthetic test role.", "source": "synthetic", "visibility": "private"}
+]
