@@ -128,6 +128,7 @@ uv run python -m src decide JOB_ID apply --fit 4 --pref 5 --reason "..."
 uv run python -m src generate JOB_ID                       # no API needed
 uv run python -m src generate JOB_ID --llm openrouter --model VENDOR/MODEL   # needs OPENROUTER_API_KEY
 uv run python -m src generate JOB_ID --llm anthropic       # needs ANTHROPIC_API_KEY
+# A new draft replaces earlier unreviewed drafts for the job; reviewed ones are kept. --keep-previous keeps all.
 uv run python -m src review JOB_ID GEN_ID --doc cv \
   --ratings factual_accuracy=5,relevance=4,evidence_selection=4,impact=4,writing_style=4,overall=4 \
   --comment "..." --edited my_cv.md --approve

@@ -114,6 +114,12 @@ def test_full_pipeline(env):
     assert fb["approved"] and fb["preference_pair"]["chosen"].endswith(".edited.md")
     assert fb["kb_version"] and fb["evidence_ids"]
 
+    # regenerating replaces unreviewed drafts but never a reviewed one
+    run(cli, "generate", JOB)
+    run(cli, "generate", JOB)
+    gens = sorted(p.name for p in (data / "generations" / JOB).iterdir())
+    assert len(gens) == 2 and gid in gens
+
 
 def test_claim_check_flags_inflated_number(env):
     from src import generate, kb
