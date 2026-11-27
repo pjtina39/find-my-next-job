@@ -58,6 +58,10 @@ cosine. There is no keyword or alias matching.
    A required item with no evidence (unsupported) caps the result at consider, never skip:
    no evidence in the KB is not proof the skill is missing. See `missing_required` in the prediction.
 
+The thresholds are uncalibrated. Slice 1 is frozen as the baseline in
+[docs/investigations/2026-11-27-cosine-baseline.md](docs/investigations/2026-11-27-cosine-baseline.md).
+Improvement ideas are collected in [docs/ideas.md](docs/ideas.md).
+
 ### Extra: LLM judge (optional)
 
 `match --judge-model VENDOR/MODEL` sends the JD and a CV to the model through
