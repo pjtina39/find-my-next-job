@@ -6,9 +6,8 @@ A job is saved in data/ (store.JOBS_DIR) as:
 The job id is <company>_<role>=<uuid>, e.g.
   jp-morgan_applied-ai-ml-senior-associate=3f2a9c1e-...
 
-Extraction is rule-based: split the JD into sections, turn each bullet
-into a requirement, and split each requirement into short phrases.
-No keyword lists: match.py maps phrases to KB skills with embeddings.
+Extraction is rule-based: split the JD into sections and turn each line
+under a known section into a requirement. match.py embeds whole requirements.
 An LLM extractor can replace this later behind the same output.
 """
 import re
@@ -79,15 +78,6 @@ def load_job(job_id: str) -> tuple[dict, str]:
     return load_registry()[job_id], jd_path(job_id).read_text()
 
 
-def phrases(text: str) -> list[str]:
-    """Split a requirement into short skill phrases, e.g.
-    "Proficiency in Python, SQL, and data science tooling" ->
-    ["Proficiency in Python", "SQL", "data science tooling"].
-    match.py embeds these and maps them to KB skills."""
-    parts = re.split(r",|;|\band\b|\bor\b|\bincluding\b", text)
-    return [p.strip(" .") for p in parts if len(p.strip(" .")) > 2]
-
-
 def section_type(heading: str) -> str | None:
     h = heading.lower()
     for pattern, kind in SECTION_TYPES:
@@ -125,7 +115,6 @@ def extract(jd: str, kb: dict | None = None) -> list[dict]:
             "id": f"r{len(reqs) + 1:02d}",
             "text": text,
             "type": kind,
-            "phrases": phrases(text),
             "years": years(text),
             "is_education": bool(re.search(r"\b(degree|bachelor|master|phd|bsc|msc)\b", text.lower())),
         })
@@ -145,7 +134,4 @@ def validate(reqs: list[dict]) -> list[str]:
         problems.append("No requirements found. Check the JD format.")
     if not any(r["type"] == "required" for r in reqs):
         problems.append("No 'required' section detected.")
-    for r in reqs:
-        if not r["phrases"]:
-            problems.append(f"{r['id']} has no phrases: {r['text'][:60]}")
     return problems

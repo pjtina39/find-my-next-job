@@ -35,7 +35,7 @@ def test_extract_sections_and_skills(env):
     assert {"responsibility", "required", "preferred"} <= types
     assert not any("fictional" in r["text"] for r in reqs), "About Us must be ignored"
     r = next(r for r in reqs if "3+ years" in r["text"])
-    assert r["years"] == 3 and "SQL" in r["phrases"]
+    assert r["years"] == 3
     assert any(r["is_education"] for r in reqs)
 
 
@@ -49,17 +49,6 @@ def test_unbulleted_short_lines_are_requirements_not_headings():
     reqs = jobs.extract(jd)
     assert [(r["type"], r["text"].split()[0]) for r in reqs] == [
         ("required", "Strong"), ("preferred", "Advanced"), ("preferred", "Familiarity")]
-
-
-def test_phrases_map_to_kb_skills_by_embedding(env):
-    from src import jobs, kb, match
-    k = kb.load(FIX / "kb")
-    reqs = jobs.extract((FIX / "jd.txt").read_text())
-    match.map_skills(reqs, k)
-    r = next(r for r in reqs if "3+ years" in r["text"])
-    assert "sql" in r["skills"]
-    kube = next(r for r in reqs if "Kubernetes" in r["text"])
-    assert kube["skills"] == [], "unknown skills must stay unmapped"
 
 
 def test_ingest_without_id_makes_company_role_uuid(env):
@@ -77,7 +66,7 @@ def test_match_needs_label_first(env):
     cli, _ = env
     ingest(cli)
     with pytest.raises(SystemExit):
-        run(cli, "match", JOB)
+        run(cli, "match", JOB, "--no-jev")
 
 
 def test_model_code_never_reads_labels():
@@ -91,7 +80,7 @@ def test_full_pipeline(env):
     cli, tmp = env
     ingest(cli)
     run(cli, "label", JOB, "apply", "--by", "tester", "--source", "test")
-    run(cli, "match", JOB)
+    run(cli, "match", JOB, "--no-jev")
     data = tmp / "data"
     pred = json.loads(next((data / "predictions" / JOB).glob("*.json")).read_text())
     assert pred["recommendation"] in ("apply", "consider", "skip")
@@ -186,20 +175,22 @@ class FakeJev:
 def test_jev_reads_probability():
     from src import jev_judge
     fake = FakeJev()
-    r = jev_judge.judge("JD text", "CV text", classifier=fake)
+    r = jev_judge.judge("JD text", "Experience text", "Python, SQL", classifier=fake)
     assert r["probability"] == 0.73 and r["input_tokens"] == 900
-    assert fake.sent["state"] == {"job_description": "JD text", "cv": "CV text"}
+    assert fake.sent["state"] == {"job_description": "JD text", "experience": "Experience text",
+                                  "skills": "Python, SQL"}
     question = fake.sent["questions"]["shortlist"]
-    assert "shortlisted" in question.instructions and question.criteria.true
+    assert "align" in question.instructions and question.criteria.true
 
 
 def test_match_with_jev_compares_with_label(env, monkeypatch):
     from src import jev_judge
     monkeypatch.setattr(jev_judge, "OpenRouterJevClassifier", FakeJev)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test")
     cli, tmp = env
     ingest(cli)
     run(cli, "label", JOB, "apply", "--by", "tester", "--source", "test")
-    run(cli, "match", JOB, "--jev")
+    run(cli, "match", JOB)  # Jev runs by default
     data = tmp / "data"
     pred = json.loads(next((data / "predictions" / JOB).glob("*.json")).read_text())
     assert pred["jev"]["probability"] == 0.73

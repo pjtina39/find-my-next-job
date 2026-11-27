@@ -1,9 +1,10 @@
 """Jev judge: an optional match metric from TypeSafe's Jev model, via OpenRouter.
 
-Jev gets the JD and a CV as its state and one yes/no question:
-"should this candidate be shortlisted?". It returns the probability of yes.
+Jev gets the JD, the candidate's experience and skills as its state, and one
+yes/no question: "does the candidate's experience and skill set align with
+the requirements of the job description?". It returns the probability of yes.
 
-Only the JD and CV go in. Never the label, decision or fit score.
+Only the JD, experience and skills go in. Never the label, decision or fit score.
 Needs OPENROUTER_API_KEY. The question is in prompts/jev_shortlist.json.
 """
 import json
@@ -13,6 +14,7 @@ from langchain_typesafe import Noul
 from langchain_typesafe.types import NoulCriteria
 
 from .jev_openrouter import OpenRouterJevClassifier
+from .judge import cv_from_kb
 
 VERSION = "jev-v0.1"
 QUESTION_FILE = Path(__file__).parent / "prompts" / "jev_shortlist.json"
@@ -26,12 +28,17 @@ def load_question(path: Path = QUESTION_FILE) -> Noul:
                 criteria=NoulCriteria(**criteria) if criteria else None)
 
 
-def judge(jd: str, cv: str, classifier=None) -> dict:
-    """Ask Jev the shortlist question for one JD and CV."""
+def profile_from_kb(kb: dict) -> tuple[str, str]:
+    """Experience (roles + non-sensitive evidence) and skill names, as plain text."""
+    return cv_from_kb(kb), ", ".join(s["name"] for s in kb["skills"])
+
+
+def judge(jd: str, experience: str, skills: str, classifier=None) -> dict:
+    """Ask Jev the shortlist question for one JD, experience and skills."""
     classifier = classifier or OpenRouterJevClassifier(timeout=60)
     question = load_question()
     response = classifier.invoke({
-        "state": {"job_description": jd, "cv": cv},
+        "state": {"job_description": jd, "experience": experience, "skills": skills},
         "questions": {"shortlist": question},
     })
     usage = response.usage

@@ -27,7 +27,7 @@ ingest JD -> label (human, before any model) -> match -> decide (human)
 |---|---|---|
 | ingest | `jobs.py` | Saves the JD text as-is with a stable job id |
 | label | `evaluate.py` | Saves my apply/skip call **before** matching |
-| match | `jobs.py`, `match.py`, `embed.py` | Splits the JD into requirements, maps JD phrases to KB skills and finds evidence for each, all with SBERT embeddings; scores fit, recommends apply/consider/skip |
+| match | `jobs.py`, `match.py`, `embed.py` | Splits the JD into requirements and finds evidence for each by SBERT embedding similarity; scores fit, recommends apply/consider/skip |
 | compare | `evaluate.py` | Compares the recommendation with my label |
 | decide | `review.py` | My final apply/skip, plus fit and preference ratings |
 | generate | `generate.py` | Writes the CV and cover letter from evidence, then checks every claim |
@@ -50,21 +50,15 @@ Everything is compared with SBERT embeddings (`all-MiniLM-L6-v2`). The model
 turns a sentence into one 384-number vector; similar meanings give a high
 cosine. There is no keyword or alias matching.
 
-1. Each JD bullet is one requirement. We split it into short phrases
-   ("Python", "SQL", "data science tooling").
-2. Each phrase is matched to its closest KB skill (skill name + aliases).
-   Below 0.5 cosine it stays unmapped and is listed as a possible gap.
-3. For each requirement and each evidence record:
-   - skill score = share of the mapped skills that the evidence has
-   - sentence score = cosine(requirement, evidence claim)
-   - score = 0.5 x skill score + 0.5 x sentence score
-4. The requirement keeps its best evidence: >= 0.6 matched, >= 0.3 partial, else unsupported.
-5. Overall fit = weighted mean over requirements (required 1.0, responsibility 0.7, preferred 0.5).
+1. Each line under a known JD section is one requirement.
+2. For each requirement and each evidence record: score = cosine(requirement, evidence claim + its skill names).
+3. The requirement keeps its best evidence: >= 0.6 matched, >= 0.3 partial, else unsupported.
+4. Overall fit = weighted mean over requirements (required 1.0, responsibility 0.7, preferred 0.5).
    >= 0.6 apply, >= 0.4 consider, else skip.
    A required item with no evidence (unsupported) caps the result at consider, never skip:
    no evidence in the KB is not proof the skill is missing. See `missing_required` in the prediction.
 
-### Second metric: LLM judge (optional)
+### Extra: LLM judge (optional)
 
 `match --judge-model VENDOR/MODEL` sends the JD and a CV to the model through
 OpenRouter and asks one question: "should this candidate be shortlisted? Yes or No".
@@ -80,11 +74,12 @@ unless you pass `--cv file.txt`. The label is never in the prompt.
 The model must return logprobs. Many OpenRouter models do not; then `p_yes` is
 empty and a note says why.
 
-### Third metric: Jev (optional)
+### Second score: Jev
 
-`match --jev` asks TypeSafe's Jev model, through OpenRouter, the same kind of
-question: should this candidate be shortlisted? Jev gets the JD and the CV as its
-state and returns the probability of yes directly, so no logprobs are needed.
+`match` also asks TypeSafe's Jev model, through OpenRouter: does the candidate's
+experience and skill set align with the requirements of the job description? Jev gets three things as its state: the JD, the candidate's
+experience (roles + non-sensitive evidence from the KB) and skills (KB skill names).
+It returns the probability of yes. Needs `OPENROUTER_API_KEY`; `--no-jev` skips it.
 
 The question and its yes/no criteria are in `src/prompts/jev_shortlist.json`.
 Edit that file to change the question. The result is stored as `jev` in the
@@ -124,7 +119,7 @@ cd find-my-next-job
 ```bash
 uv run python -m src ingest --jd jd.txt --company "Company" --title "Role" --url URL   # saves data/jd/<company>_<role>=<uuid>.txt + an entry in data/job.json
 uv run python -m src label JOB_ID apply --by me --source "decided before running the model"
-uv run python -m src match JOB_ID                         # add --judge-model VENDOR/MODEL and/or --jev
+uv run python -m src match JOB_ID                         # embedding score + Jev; --no-jev to skip Jev
 uv run python -m src decide JOB_ID apply --fit 4 --pref 5 --reason "..."
 uv run python -m src generate JOB_ID                       # no API needed
 uv run python -m src generate JOB_ID --llm openrouter --model VENDOR/MODEL   # needs OPENROUTER_API_KEY
@@ -143,9 +138,8 @@ data folder, not here. One job is one case, not an accuracy number.
 ## Limitations
 
 - **Requirement extraction is rule-based.** It relies on headings and bullets. Odd JD layouts need a check (`requirements.json` lists warnings).
-- **Phrase splitting is crude.** It splits on commas, "and", "or". Some phrases are filler ("design", "test"); they are left out of the skill score, which also means a real unmapped skill can hide there. Check `unmapped_phrases` in the prediction.
 - **The model downloads from Hugging Face on first run.** The build environment blocks that, so SBERT matching has only been tested with a fake encoder. Run it locally.
-- **Thresholds and weights are guesses** (0.5 skill match, 0.5/0.5 weights, 0.6/0.3, 0.6/0.4). None are tuned for SBERT yet. Re-check them after the first SBERT run. Tune them when there are more labelled jobs.
+- **Thresholds and weights are guesses** (0.6/0.3 per requirement, 0.6/0.4 overall). None are tuned for SBERT yet. Re-check them after the first SBERT run. Tune them when there are more labelled jobs.
 - **Education and seniority** are not in the KB, so they come back as `needs_human`.
 - **Years of experience** is an estimate from role dates, not a claim.
 - **The extractive generator** reuses evidence wording. It is safe but reads like a list. The LLM option writes better prose but has not been run yet (no key in the build environment).

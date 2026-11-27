@@ -58,14 +58,12 @@ def extractive(job: dict, kb: dict, prediction: dict, evidence: list, name: str)
         by_role.setdefault(ev["experience_id"] or ev.get("project_id"), []).append(ev)
     skill_name = {s["id"]: s["name"] for s in kb["skills"]}
 
-    # skills: ones with relevant evidence first
-    # skills: the ones the JD asks for most come first; only skills with evidence
-    have = {s for ev in evidence for s in ev["skills"]}
-    asked = {}
-    for r in prediction["requirements"]:
-        for sid in r["skills"]:
-            asked[sid] = asked.get(sid, 0) + TYPE_WEIGHT.get(r["type"], 0)
-    top_skills = [skill_name[s] for s in sorted(have, key=lambda s: (-asked.get(s, 0), s))]
+    # skills: those on the evidence most relevant to this JD come first
+    weight = {}
+    for ev in evidence:
+        for s in ev["skills"]:
+            weight[s] = weight.get(s, 0) + ev["relevance"]
+    top_skills = [skill_name[s] for s in sorted(weight, key=lambda s: (-weight[s], s))]
 
     cv = [line(f"# {name}", kind="header"),
           line(f"Tailored for: {job['title']}, {job['company']}", kind="header"),

@@ -1,18 +1,9 @@
 """Evidence retrieval and qualification-fit scoring.
 
-Everything is embedded with SBERT (see embed.py). No keyword matching.
+Embedding only (SBERT, see embed.py). No skill mapping, no keywords.
 
-1. Skill mapping: each requirement is split into short phrases
-   (jobs.phrases). Each phrase is embedded and compared with every KB
-   skill (name + aliases). A phrase maps to its closest KB skill if the
-   cosine is at least SKILL_SIM. Otherwise it is an unknown skill (a gap).
-2. For each requirement and each evidence record:
-     skill score = share of the requirement's mapped phrases whose KB
-                   skill this evidence has. Unmapped phrases are often filler
-                   ("design", "test"), so they are left out of the share but
-                   listed as possible gaps. No mapped phrase = skill score 0.
-     sentence score = cosine(requirement sentence, evidence sentence)
-     score = 0.5 x skill score + 0.5 x sentence score
+For each requirement and each evidence record:
+    score = cosine(requirement sentence, evidence sentence)
 We keep the top evidence (with ids and source refs) and label the
 requirement matched / partial / unsupported / needs_human.
 
@@ -23,35 +14,11 @@ from datetime import date
 
 from . import embed
 
-METHOD_VERSION = "match-v0.4-must-have"
-SKILL_WEIGHT, TEXT_WEIGHT = 0.5, 0.5
-SKILL_SIM = 0.5                        # phrase -> KB skill threshold (untuned)
-MATCHED, PARTIAL = 0.6, 0.3            # requirement thresholds
+METHOD_VERSION = "match-v0.5-embedding-only"
+MATCHED, PARTIAL = 0.6, 0.3            # requirement thresholds (untuned for SBERT)
 APPLY, CONSIDER = 0.6, 0.4             # overall recommendation thresholds
 TYPE_WEIGHT = {"required": 1.0, "responsibility": 0.7, "preferred": 0.5, "context": 0.0}
 TOP_K = 3
-
-def skill_text(skill: dict) -> str:
-    return skill["name"] + ": " + ", ".join(skill["aliases"])
-
-
-def map_skills(reqs: list[dict], kb: dict) -> None:
-    """Add r["skill_matches"] and r["skills"] to each requirement, in place."""
-    all_phrases = [p for r in reqs for p in r["phrases"]]
-    if not all_phrases:
-        return
-    skill_vecs = embed.encode([skill_text(s) for s in kb["skills"]])
-    sims = embed.encode(all_phrases) @ skill_vecs.T   # rows = phrases, cols = skills
-    i = 0
-    for r in reqs:
-        r["skill_matches"] = []
-        for p in r["phrases"]:
-            j = int(sims[i].argmax())
-            best = float(sims[i][j])
-            r["skill_matches"].append({"phrase": p, "sim": round(best, 3),
-                                       "skill_id": kb["skills"][j]["id"] if best >= SKILL_SIM else None})
-            i += 1
-        r["skills"] = sorted({m["skill_id"] for m in r["skill_matches"] if m["skill_id"]})
 
 
 def evidence_text(ev: dict, kb: dict) -> str:
@@ -82,18 +49,11 @@ def score_requirement(req: dict, kb: dict, sims, years_have: float) -> dict:
         return {**req, "status": "needs_human", "score": None, "evidence": [],
                 "note": "Education is not modelled in the KB yet. Check by hand."}
 
-    scored = []
-    for ev, sim in zip(kb["evidence"], sims):
-        ms = [m for m in req.get("skill_matches", []) if m["skill_id"]]
-        cov = (sum(1 for m in ms if m["skill_id"] in ev["skills"]) / len(ms)) if ms else 0.0
-        sim = max(float(sim), 0.0)
-        s = SKILL_WEIGHT * cov + TEXT_WEIGHT * sim
-        scored.append((s, cov, sim, ev))
-    scored.sort(key=lambda x: -x[0])
-    top = [{"evidence_id": ev["id"], "score": round(s, 3), "skill_overlap": round(cov, 2),
-            "sentence_sim": round(sim, 3), "source_ref": ev["source"]["ref"],
+    scored = sorted(((max(float(sim), 0.0), ev) for ev, sim in zip(kb["evidence"], sims)),
+                    key=lambda x: -x[0])
+    top = [{"evidence_id": ev["id"], "score": round(s, 3), "source_ref": ev["source"]["ref"],
             "has_metrics": bool(ev["metrics"])}
-           for s, cov, sim, ev in scored[:TOP_K] if s > 0]
+           for s, ev in scored[:TOP_K] if s > 0]
     best = top[0]["score"] if top else 0.0
 
     note = ""
@@ -110,7 +70,6 @@ def predict(job: dict, reqs: list[dict], kb: dict) -> dict:
     """Score all requirements and give an apply / consider / skip recommendation."""
     years_have = relevant_years(kb)
     reqs = [dict(r) for r in reqs if r["type"] != "context"]
-    map_skills(reqs, kb)
     ev_vecs = embed.encode([evidence_text(ev, kb) for ev in kb["evidence"]])
     req_vecs = embed.encode([r["text"] for r in reqs]) if reqs else ev_vecs[:0]
     sim_matrix = req_vecs @ ev_vecs.T   # rows = requirements, cols = evidence
@@ -120,11 +79,9 @@ def predict(job: dict, reqs: list[dict], kb: dict) -> dict:
     wsum = sum(TYPE_WEIGHT[r["type"]] for r in scored) or 1.0
     fit = sum(TYPE_WEIGHT[r["type"]] * r["score"] for r in scored) / wsum
 
-    skill_reqs = [r for r in scored if r["skills"]]
     year_reqs = [r for r in scored if r["years"]]
     matched = [r for r in scored if r["status"] == "matched"]
     dims = {
-        "skills": avg(r["score"] for r in skill_reqs),
         "experience": avg(r["score"] for r in year_reqs),
         "achievements": avg(1.0 if r["evidence"] and r["evidence"][0]["has_metrics"] else 0.0
                             for r in matched),
@@ -137,7 +94,6 @@ def predict(job: dict, reqs: list[dict], kb: dict) -> dict:
         "job_id": job["job_id"],
         "method_version": METHOD_VERSION,
         "embed_model": embed.MODEL_NAME,
-        "weights": {"skill": SKILL_WEIGHT, "sentence": TEXT_WEIGHT},
         "kb_version": kb["version"],
         "fit_score": round(fit, 3),
         "recommendation": rec,
@@ -146,10 +102,8 @@ def predict(job: dict, reqs: list[dict], kb: dict) -> dict:
         "counts": dict(counts),
         "strengths": [r["text"] for r in sorted(matched, key=lambda r: -r["score"])[:5]],
         "gaps": [r["text"] for r in results if r["status"] in ("unsupported", "needs_human")],
-        "unmapped_phrases": [m["phrase"] for r in results for m in r.get("skill_matches", [])
-                             if not m["skill_id"]],
         "requirements": results,
-        "thresholds": {"skill_sim": SKILL_SIM, "matched": MATCHED, "partial": PARTIAL, "apply": APPLY, "consider": CONSIDER},
+        "thresholds": {"matched": MATCHED, "partial": PARTIAL, "apply": APPLY, "consider": CONSIDER},
     }
 
 

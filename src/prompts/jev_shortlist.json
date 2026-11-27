@@ -1,7 +1,7 @@
 {
-  "instructions": "The state holds a job description and a candidate's CV. Based only on these two, should this candidate be shortlisted for an interview for this role?",
+  "instructions": "Does the candidate's experience and skill set align with the requirements of the job description?",
   "criteria": {
-    "true": "The CV shows evidence for most of the required skills and experience in the job description, and no core requirement is clearly missing.",
-    "false": "The CV is missing one or more core requirements (a required skill, level of experience or domain), or the role does not fit the candidate's background."
+    "true": "The candidate demonstrates sufficient alignment with the core requirements of the job description through direct experience or relevant transferable skills. Gaps in non-essential skills, domain experience or educational qualifications are acceptable where relevant experience can compensate.",
+    "false": "The candidate lacks essential technical skills, specialist expertise or the level of experience critical to performing the role, and these gaps cannot reasonably be compensated for by transferable skills or equivalent experience."
   }
 }
