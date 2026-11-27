@@ -47,8 +47,8 @@ Rubrics and record fields: [docs/rubrics.md](docs/rubrics.md).
 ## Setup
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+uv sync                                        # creates .venv; add --extra anthropic for --llm anthropic
+source .venv/bin/activate                      # or prefix commands with `uv run`
 export FMNJ_KB_DIR=../career-knowledge-base
 export FMNJ_DATA_DIR=~/fmnj-private-data      # anywhere outside this repo
 export FMNJ_CANDIDATE_NAME="Your Name"

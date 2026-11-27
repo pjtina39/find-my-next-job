@@ -1,4 +1,0 @@
-numpy
-sentence-transformers   # SBERT for matching; downloads the model on first run
-pytest
-anthropic               # optional, only for --llm anthropic
