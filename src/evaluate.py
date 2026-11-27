@@ -41,10 +41,14 @@ def compare(prediction: dict) -> dict:
     lenient = pred == truth or (pred == "consider" and truth == "apply")
     j = prediction.get("llm_judge") or {}
     judge_agree = None if j.get("p_yes") is None else (j["p_yes"] >= 0.5) == (truth == "apply")
+    jev = prediction.get("jev") or {}
+    jev_agree = None if jev.get("probability") is None else (jev["probability"] >= 0.5) == (truth == "apply")
     return {
         "job_id": prediction["job_id"],
         "judge_p_yes": j.get("p_yes"),
         "judge_agree": judge_agree,   # p_yes >= 0.5 counts as apply
+        "jev_probability": jev.get("probability"),
+        "jev_agree": jev_agree,       # probability >= 0.5 counts as apply
         "prediction_id": prediction["prediction_id"],
         "label_id": label["label_id"],
         "predicted": pred,

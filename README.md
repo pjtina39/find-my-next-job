@@ -78,6 +78,22 @@ unless you pass `--cv file.txt`. The label is never in the prompt.
 The model must return logprobs. Many OpenRouter models do not; then `p_yes` is
 empty and a note says why.
 
+### Third metric: Jev (optional)
+
+`match --jev` asks TypeSafe's Jev model, through OpenRouter, the same kind of
+question: should this candidate be shortlisted? Jev gets the JD and the CV as its
+state and returns the probability of yes directly, so no logprobs are needed.
+
+The question and its yes/no criteria are in `src/prompts/jev_shortlist.json`.
+Edit that file to change the question. The result is stored as `jev` in the
+prediction (probability, cost, latency, tokens) and compared with the label
+(`jev_probability`, `jev_agree`). Like the LLM judge, it does not change the fit
+score or the recommendation, and the label is never sent.
+
+Code: `src/jev_judge.py` (the question and the call) and `src/jev_openrouter.py`
+(points the LangChain TypeSafe classifier at OpenRouter). `langchain-typesafe` is
+pinned to `0.0.1a3` because `jev_openrouter.py` overrides internals that changed in 0.1.0.
+
 We do not embed the whole JD as one vector. The model cuts input at about 256
 word pieces, and one vector would blur twenty requirements together.
 
@@ -106,7 +122,7 @@ cd find-my-next-job
 ```bash
 uv run python -m src ingest JOB_ID --jd jd.txt --company "Company" --title "Role" --url URL
 uv run python -m src label JOB_ID apply --by me --source "decided before running the model"
-uv run python -m src match JOB_ID                         # add --judge-model VENDOR/MODEL for the LLM judge
+uv run python -m src match JOB_ID                         # add --judge-model VENDOR/MODEL and/or --jev
 uv run python -m src decide JOB_ID apply --fit 4 --pref 5 --reason "..."
 uv run python -m src generate JOB_ID                       # no API needed
 uv run python -m src generate JOB_ID --llm openrouter --model VENDOR/MODEL   # needs OPENROUTER_API_KEY

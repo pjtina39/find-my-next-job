@@ -1,0 +1,7 @@
+{
+  "instructions": "The state holds a job description and a candidate's CV. Based only on these two, should this candidate be shortlisted for an interview for this role?",
+  "criteria": {
+    "true": "The CV shows evidence for most of the required skills and experience in the job description, and no core requirement is clearly missing.",
+    "false": "The CV is missing one or more core requirements (a required skill, level of experience or domain), or the role does not fit the candidate's background."
+  }
+}

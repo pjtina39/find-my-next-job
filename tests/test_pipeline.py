@@ -58,7 +58,7 @@ def test_match_needs_label_first(env):
 
 def test_model_code_never_reads_labels():
     """Extraction, matching and generation must not touch labels."""
-    for name in ["jobs.py", "match.py", "generate.py", "judge.py"]:
+    for name in ["jobs.py", "match.py", "generate.py", "judge.py", "jev_judge.py"]:
         src = (Path(__file__).parent.parent / "src" / name).read_text()
         assert "import evaluate" not in src and "evaluate import" not in src and '"labels"' not in src, name
 
@@ -132,3 +132,42 @@ def test_judge_reads_p_yes_from_logprobs():
     assert "label" not in sent["messages"][0]["content"].lower()
     no_lp = {"choices": [{"message": {"content": "Yes"}}]}
     assert judge.judge("JD", "CV", "m", call=lambda b: no_lp)["p_yes"] is None
+
+
+class FakeJev:
+    """Stands in for OpenRouterJevClassifier: records the request, returns a fixed answer."""
+    def __init__(self, *args, **kwargs):
+        self.sent = None
+
+    def invoke(self, request):
+        from langchain_typesafe.types import ClassifierResponse, NoulAnswer
+        self.sent = request
+        return ClassifierResponse(
+            model="~typesafe/jev-latest",
+            answers={"shortlist": NoulAnswer(type="noul", noul=0.73)},
+            usage={"input_tokens": 900, "output_tokens": 1, "total_tokens": 901},
+        )
+
+
+def test_jev_reads_probability():
+    from src import jev_judge
+    fake = FakeJev()
+    r = jev_judge.judge("JD text", "CV text", classifier=fake)
+    assert r["probability"] == 0.73 and r["input_tokens"] == 900
+    assert fake.sent["state"] == {"job_description": "JD text", "cv": "CV text"}
+    question = fake.sent["questions"]["shortlist"]
+    assert "shortlisted" in question.instructions and question.criteria.true
+
+
+def test_match_with_jev_compares_with_label(env, monkeypatch):
+    from src import jev_judge
+    monkeypatch.setattr(jev_judge, "OpenRouterJevClassifier", FakeJev)
+    cli, tmp = env
+    ingest(cli)
+    run(cli, "label", JOB, "apply", "--by", "tester", "--source", "test")
+    run(cli, "match", JOB, "--jev")
+    data = tmp / "data"
+    pred = json.loads(next((data / "predictions" / JOB).glob("*.json")).read_text())
+    assert pred["jev"]["probability"] == 0.73
+    cmp = json.loads(next((data / "evaluations" / JOB).glob("*.json")).read_text())
+    assert cmp["jev_probability"] == 0.73 and cmp["jev_agree"] is True

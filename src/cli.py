@@ -8,7 +8,7 @@ import json
 import sys
 from pathlib import Path
 
-from . import evaluate, generate, jobs, judge, kb as kbmod, match, review, store
+from . import evaluate, generate, jev_judge, jobs, judge, kb as kbmod, match, review, store
 
 
 def cmd_ingest(a):
@@ -39,10 +39,15 @@ def cmd_match(a):
     pred["created_at"] = store.now()
     pred["code_version"] = store.git_rev(store.REPO_DIR)
     pred["inputs"] = ["jobs/<job_id>/jd.md", "career-knowledge-base"]  # labels are never inputs
-    if a.judge_model:
+    if a.judge_model or a.jev:
         cv = Path(a.cv).read_text() if a.cv else judge.cv_from_kb(kb)
+        cv_source = a.cv or "built from KB (non-sensitive evidence)"
+    if a.judge_model:
         pred["llm_judge"] = judge.judge(jd, cv, a.judge_model)
-        pred["llm_judge"]["cv_source"] = a.cv or "built from KB (non-sensitive evidence)"
+        pred["llm_judge"]["cv_source"] = cv_source
+    if a.jev:
+        pred["jev"] = jev_judge.judge(jd, cv)
+        pred["jev"]["cv_source"] = cv_source
     store.write_json(store.path("predictions", a.job_id, f"{pred['prediction_id']}.json"), pred)
 
     cmp = evaluate.compare(pred)
@@ -54,6 +59,9 @@ def cmd_match(a):
     if "llm_judge" in pred:
         j = pred["llm_judge"]
         print(f"LLM judge ({j['model']}): answer={j['answer']!r} p_yes={j['p_yes']} {j['note']}")
+    if "jev" in pred:
+        j = pred["jev"]
+        print(f"Jev ({j['model']}): p_shortlist={j['probability']} cost=${j['cost']} latency={j['latency_s']}s")
     print(f"Label {cmp['label']}: strict agree={cmp['agree_strict']}, lenient agree={cmp['agree_lenient']}")
     print(f"Prediction {pred['prediction_id']}")
 
@@ -120,7 +128,9 @@ def main(argv=None):
     s = sub.add_parser("match", help="extract requirements, score fit, compare with label")
     s.add_argument("job_id")
     s.add_argument("--judge-model", help="OpenRouter model id for the yes/no LLM judge (optional)")
-    s.add_argument("--cv", help="CV text file for the judge; default builds one from the KB")
+    s.add_argument("--jev", action="store_true",
+                   help="also ask TypeSafe's Jev (via OpenRouter) for P(shortlist) (optional)")
+    s.add_argument("--cv", help="CV text file for the judges; default builds one from the KB")
     s.set_defaults(f=cmd_match)
 
     s = sub.add_parser("decide", help="final human apply/skip after seeing the match")
