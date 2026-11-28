@@ -71,7 +71,7 @@ def test_match_needs_label_first(env):
 
 def test_model_code_never_reads_labels():
     """Extraction, matching and generation must not touch labels."""
-    for name in ["jobs.py", "match.py", "generate.py", "judge.py", "jev_judge.py"]:
+    for name in ["jobs.py", "match.py", "generate.py", "judge.py", "jev_predict.py"]:
         src = (Path(__file__).parent.parent / "src" / name).read_text()
         assert "import evaluate" not in src and "evaluate import" not in src and '"labels"' not in src, name
 
@@ -113,6 +113,12 @@ def test_full_pipeline(env):
     fb = json.loads(next((data / "feedback" / JOB).glob("*.json")).read_text())
     assert fb["approved"] and fb["preference_pair"]["chosen"].endswith(".edited.md")
     assert fb["kb_version"] and fb["evidence_ids"]
+
+    # regenerating replaces unreviewed drafts but never a reviewed one
+    run(cli, "generate", JOB)
+    run(cli, "generate", JOB)
+    gens = sorted(p.name for p in (data / "generations" / JOB).iterdir())
+    assert len(gens) == 2 and gid in gens
 
 
 def test_claim_check_flags_inflated_number(env):
@@ -173,9 +179,9 @@ class FakeJev:
 
 
 def test_jev_reads_probability():
-    from src import jev_judge
+    from src import jev_predict
     fake = FakeJev()
-    r = jev_judge.judge("JD text", "Experience text", "Python, SQL", classifier=fake)
+    r = jev_predict.predict("JD text", "Experience text", "Python, SQL", classifier=fake)
     assert r["probability"] == 0.73 and r["input_tokens"] == 900
     assert fake.sent["state"] == {"job_description": "JD text", "experience": "Experience text",
                                   "skills": "Python, SQL"}
@@ -184,8 +190,8 @@ def test_jev_reads_probability():
 
 
 def test_match_with_jev_compares_with_label(env, monkeypatch):
-    from src import jev_judge
-    monkeypatch.setattr(jev_judge, "OpenRouterJevClassifier", FakeJev)
+    from src import jev_predict
+    monkeypatch.setattr(jev_predict, "OpenRouterJevClassifier", FakeJev)
     monkeypatch.setenv("OPENROUTER_API_KEY", "test")
     cli, tmp = env
     ingest(cli)

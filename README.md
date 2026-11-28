@@ -58,6 +58,10 @@ cosine. There is no keyword or alias matching.
    A required item with no evidence (unsupported) caps the result at consider, never skip:
    no evidence in the KB is not proof the skill is missing. See `missing_required` in the prediction.
 
+The thresholds are uncalibrated. Slice 1 is frozen as the baseline in
+[docs/investigations/2026-11-27-cosine-baseline.md](docs/investigations/2026-11-27-cosine-baseline.md).
+Improvement ideas are collected in [docs/ideas.md](docs/ideas.md).
+
 ### Extra: LLM judge (optional)
 
 `match --judge-model VENDOR/MODEL` sends the JD and a CV to the model through
@@ -87,7 +91,7 @@ prediction (probability, cost, latency, tokens) and compared with the label
 (`jev_probability`, `jev_agree`). Like the LLM judge, it does not change the fit
 score or the recommendation, and the label is never sent.
 
-Code: `src/jev_judge.py` (the question and the call) and `src/jev_openrouter.py`
+Code: `src/jev_predict.py` (the question and the call) and `src/jev_openrouter.py`
 (points the LangChain TypeSafe classifier at OpenRouter). `langchain-typesafe` is
 pinned to `0.0.1a3` because `jev_openrouter.py` overrides internals that changed in 0.1.0.
 
@@ -124,6 +128,7 @@ uv run python -m src decide JOB_ID apply --fit 4 --pref 5 --reason "..."
 uv run python -m src generate JOB_ID                       # no API needed
 uv run python -m src generate JOB_ID --llm openrouter --model VENDOR/MODEL   # needs OPENROUTER_API_KEY
 uv run python -m src generate JOB_ID --llm anthropic       # needs ANTHROPIC_API_KEY
+# A new draft replaces earlier unreviewed drafts for the job; reviewed ones are kept. --keep-previous keeps all.
 uv run python -m src review JOB_ID GEN_ID --doc cv \
   --ratings factual_accuracy=5,relevance=4,evidence_selection=4,impact=4,writing_style=4,overall=4 \
   --comment "..." --edited my_cv.md --approve

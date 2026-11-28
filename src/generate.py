@@ -226,10 +226,11 @@ def to_markdown(doc: list) -> str:
 
 def generate(job: dict, jd: str, kb: dict, prediction: dict, provider: str | None = None,
              model: str | None = None, allow_sensitive: bool = False,
-             lines_file: str | None = None) -> dict:
+             lines_file: str | None = None, replace: bool = True) -> dict:
     """provider: None = extractive, 'anthropic' / 'openrouter' = API call,
     'file' = lines written elsewhere (e.g. by a Claude session) in the same
-    JSON format as the LLM output. All go through the same claim check."""
+    JSON format as the LLM output. All go through the same claim check.
+    replace: the new draft replaces earlier unreviewed drafts for this job."""
     use_llm = provider is not None
     name = os.environ.get("FMNJ_CANDIDATE_NAME", "Candidate")
     evidence, excluded = select_evidence(kb, prediction, allow_sensitive)
@@ -265,4 +266,22 @@ def generate(job: dict, jd: str, kb: dict, prediction: dict, provider: str | Non
             "claim_flags": check_claims(doc, kb),
         }
     store.write_json(folder / "meta.json", meta)
+    if replace:
+        meta["replaced"] = replace_unreviewed(job["job_id"], keep=gen_id)
     return meta
+
+
+def replace_unreviewed(job_id: str, keep: str) -> list[str]:
+    """Delete this job's earlier drafts that nobody has reviewed yet.
+    Reviewed drafts stay: their ratings, edits and preference pairs are the
+    feedback data, and feedback records point at them."""
+    import shutil
+    gens = store.path("generations", job_id, "x").parent
+    fb_dir = store.path("feedback", job_id, "x").parent
+    reviewed = {store.read_json(p)["generation_id"] for p in fb_dir.glob("*.json")}
+    removed = []
+    for d in sorted(gens.iterdir()):
+        if d.is_dir() and d.name != keep and d.name not in reviewed:
+            shutil.rmtree(d)
+            removed.append(d.name)
+    return removed

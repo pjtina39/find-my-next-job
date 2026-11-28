@@ -9,7 +9,7 @@ import os
 import sys
 from pathlib import Path
 
-from . import evaluate, generate, jev_judge, jobs, judge, kb as kbmod, match, review, store
+from . import evaluate, generate, jev_predict, jobs, judge, kb as kbmod, match, review, store
 
 
 def cmd_ingest(a):
@@ -43,7 +43,7 @@ def cmd_match(a):
     pred["code_version"] = store.git_rev(store.REPO_DIR)
     pred["inputs"] = ["data/jd/<job_id>.txt", "career-knowledge-base"]  # labels are never inputs
     if a.jev:
-        pred["jev"] = jev_judge.judge(jd, *jev_judge.profile_from_kb(kb))
+        pred["jev"] = jev_predict.predict(jd, *jev_predict.profile_from_kb(kb))
     if a.judge_model:
         cv = Path(a.cv).read_text() if a.cv else judge.cv_from_kb(kb)
         pred["llm_judge"] = judge.judge(jd, cv, a.judge_model)
@@ -89,8 +89,10 @@ def cmd_generate(a):
     job, jd = jobs.load_job(a.job_id)
     meta = generate.generate(job, jd, kb, latest_prediction(a.job_id),
                              "file" if a.from_file else a.llm, a.model, a.allow_sensitive,
-                             a.from_file)
+                             a.from_file, replace=not a.keep_previous)
     print(f"Generation {meta['generation_id']}")
+    if meta.get("replaced"):
+        print(f"  replaced {len(meta['replaced'])} earlier unreviewed draft(s)")
     for kind, doc in meta["documents"].items():
         print(f"  {kind}: {len(doc['evidence_ids'])} evidence ids, {len(doc['claim_flags'])} flags")
         for f in doc["claim_flags"]:
@@ -148,6 +150,8 @@ def main(argv=None):
     s.add_argument("--model", help="model id, required for openrouter; a label for --from-file")
     s.add_argument("--from-file", help="JSON with cv and cover_letter lines written elsewhere")
     s.add_argument("--allow-sensitive", action="store_true")
+    s.add_argument("--keep-previous", action="store_true",
+                   help="keep earlier drafts (default: replace unreviewed ones; reviewed drafts are always kept)")
     s.set_defaults(f=cmd_generate)
 
     s = sub.add_parser("review", help="rate, edit and approve a document")
