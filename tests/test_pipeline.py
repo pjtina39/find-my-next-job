@@ -181,7 +181,7 @@ class FakeJev:
 def test_jev_reads_probability():
     from src import jev_predict
     fake = FakeJev()
-    r = jev_predict.judge("JD text", "Experience text", "Python, SQL", classifier=fake)
+    r = jev_predict.predict("JD text", "Experience text", "Python, SQL", classifier=fake)
     assert r["probability"] == 0.73 and r["input_tokens"] == 900
     assert fake.sent["state"] == {"job_description": "JD text", "experience": "Experience text",
                                   "skills": "Python, SQL"}

@@ -33,7 +33,7 @@ def profile_from_kb(kb: dict) -> tuple[str, str]:
     return cv_from_kb(kb), ", ".join(s["name"] for s in kb["skills"])
 
 
-def judge(jd: str, experience: str, skills: str, classifier=None) -> dict:
+def predict(jd: str, experience: str, skills: str, classifier=None) -> dict:
     """Ask Jev the shortlist question for one JD, experience and skills."""
     classifier = classifier or OpenRouterJevClassifier(timeout=60)
     question = load_question()
