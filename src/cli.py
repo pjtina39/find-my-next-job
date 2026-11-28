@@ -9,7 +9,7 @@ import os
 import sys
 from pathlib import Path
 
-from . import evaluate, generate, jev_judge, jobs, judge, kb as kbmod, match, review, store
+from . import evaluate, generate, jev_predict, jobs, judge, kb as kbmod, match, review, store
 
 
 def cmd_ingest(a):
@@ -43,7 +43,7 @@ def cmd_match(a):
     pred["code_version"] = store.git_rev(store.REPO_DIR)
     pred["inputs"] = ["data/jd/<job_id>.txt", "career-knowledge-base"]  # labels are never inputs
     if a.jev:
-        pred["jev"] = jev_judge.judge(jd, *jev_judge.profile_from_kb(kb))
+        pred["jev"] = jev_predict.judge(jd, *jev_predict.profile_from_kb(kb))
     if a.judge_model:
         cv = Path(a.cv).read_text() if a.cv else judge.cv_from_kb(kb)
         pred["llm_judge"] = judge.judge(jd, cv, a.judge_model)

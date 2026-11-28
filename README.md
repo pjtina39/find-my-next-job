@@ -91,7 +91,7 @@ prediction (probability, cost, latency, tokens) and compared with the label
 (`jev_probability`, `jev_agree`). Like the LLM judge, it does not change the fit
 score or the recommendation, and the label is never sent.
 
-Code: `src/jev_judge.py` (the question and the call) and `src/jev_openrouter.py`
+Code: `src/jev_predict.py` (the question and the call) and `src/jev_openrouter.py`
 (points the LangChain TypeSafe classifier at OpenRouter). `langchain-typesafe` is
 pinned to `0.0.1a3` because `jev_openrouter.py` overrides internals that changed in 0.1.0.
 
